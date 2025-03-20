@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "commonjs",
+    "strict": true,
+    "outDir": "dist",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "jsx": "react",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "*": ["node_modules/*"]
+    },
+    "types": ["node", "electron"], // Add Electron types here
+    "typeRoots": ["./node_modules/@types", "./src"] // Include custom types
+  },
+  "include": [
+    "src/**/*",  // Automatically includes all TypeScript files including global.d.ts
+    "public/**/*"
+  ]
+}
