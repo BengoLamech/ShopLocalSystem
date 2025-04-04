@@ -36,65 +36,8 @@ const HomeDashboard = () => {
       fetchShopDetails();
     }, []);
   return (
-    <div className='home-dash-container'>
-         <section className="header">
-          <FontAwesomeIcon icon={faStore} className="icon" />
-          <h1>Welcome to {shopName} Sales System</h1>
-         </section>
-         <section className='home-sidebar'>
-            <div className="sidebar-content">
-              {/* Sell Dropdown */}
-              <li className="navList">
-                  <div className="dropdown-header" onClick={() => toggleMenu("sell")}>
-                    Sell{" "}
-                    <FontAwesomeIcon
-                      icon={activeDropdown === "sell" ? faCaretUp : faCaretDown}
-                      className="icon"
-                    />
-                  </div>
-                  {activeDropdown === "sell" && (
-                    <ul className="dropdown-menu">
-                      <li>
-                        <Link to="/sell">
-                          <FontAwesomeIcon
-                            icon={faCashRegister}
-                            className="icon"
-                          />{" "}
-                          Sell Now
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/SalesHistory">
-                          <FontAwesomeIcon
-                            icon={faCashRegister}
-                            className="icon"
-                          />{" "}
-                          Revoke Sales
-                        </Link>
-                      </li>
-                    </ul>
-                    )}
-                </li>                
-                  {/* Logout Button */}
-                  <ul className="navList-home">
-                    <li>
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          window.electron.ipcRenderer.send("logout");
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faArrowLeft} className="icon" /> Logout
-                      </a>
-                    </li>
-                  </ul>
-                {/* App Version */}
-                  <div className="app-version">
-                    <p>App Version: 1.0.0</p>
-                  </div>
-            </div>              
-         </section>
+    <div className='home-dash-container'>      
+         
          <section className='home-body'>
             <article onClick={handleClick} className='home-article'     
             >

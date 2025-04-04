@@ -105,7 +105,7 @@ const Register: React.FC = () => {
         <button onClick={handleRegister}>Register</button>
         {message && <p>{message}</p>}
         <div>
-          <button onClick={() => navigate("/")}>Back to Login</button> 
+          <button onClick={() => navigate("/")}>Back to Home</button> 
         </div>
       </div>
     </div>

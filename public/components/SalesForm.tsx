@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 
 interface Product {
   id: number;
@@ -56,8 +57,8 @@ const SalesForm: React.FC = () => {
   const [error, setError] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [shopOwner, setShopOwner] = useState<ShopOwner | null>(null);
-  const [receiptVisible, setReceiptVisible] = useState<boolean>(false);
-  const [vatRate, setVatRate] = useState<number>(0); // VAT rate in percentage (0%, 8%, 16%)
+  const [vatRate, setVatRate] = useState<number>(0);
+  const [showReceiptPopup, setShowReceiptPopup] = useState<boolean>(false);
   const receiptRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -79,8 +80,6 @@ const SalesForm: React.FC = () => {
     const fetchShopOwnerDetails = async () => {
       try {
         const response = await window.electron.ipcRenderer.invoke("get-shop-owner-details");
-        console.log("Shop Owner Response:", response);
-
         if (response && response.success && response.shopOwner) {
           setShopOwner(response.shopOwner);
         } else {
@@ -98,9 +97,9 @@ const SalesForm: React.FC = () => {
   }, []);
 
   const handleInputChange = (field: keyof SelectedProduct, value: any) => {
-    setError(""); // Clear previous errors
+    setError("");
 
-    let numericValue = Number(value);
+    let numericValue: number = Number(value);
     if (isNaN(numericValue) || numericValue < 0) {
       numericValue = 0;
     }
@@ -137,7 +136,7 @@ const SalesForm: React.FC = () => {
         currentSale.quantity *
         (1 - currentSale.discount / 100);
 
-      const priceWithVat = priceBeforeVat * (1 + vatRate / 100); // Include VAT
+      const priceWithVat = priceBeforeVat * (1 + vatRate / 100);
       setCurrentSale((prev) => ({
         ...prev,
         totalPrice: parseFloat(priceWithVat.toFixed(2)),
@@ -188,7 +187,7 @@ const SalesForm: React.FC = () => {
       totalPrice: 0,
     });
     setError("");
-    setSearchTerm(""); // Clear the search term after adding the product
+    setSearchTerm("");
   };
 
   const calculateTotalCost = () =>
@@ -222,8 +221,8 @@ const SalesForm: React.FC = () => {
       });
 
       setProducts(updatedProducts);
-      setSelectedProducts([]);
       setSuccessMessage("Sale completed successfully.");
+      setShowReceiptPopup(true);
     } catch (err) {
       console.error("Error completing sale:", err);
       setError("An error occurred while processing the sale.");
@@ -233,81 +232,100 @@ const SalesForm: React.FC = () => {
   const handlePrintReceipt = () => {
     if (receiptRef.current) {
       const receipt = receiptRef.current;
-
-      // Hide buttons before printing
       const buttons = receipt.querySelectorAll("button");
       buttons.forEach((button) => (button.style.display = "none"));
-
+      
+      receipt.style.display = "block";
       window.print();
-
-      // Revert button display after printing
+      receipt.style.display = "none";
+      
       buttons.forEach((button) => (button.style.display = "inline-block"));
     }
   };
 
   const handleDownloadReceipt = () => {
-    // Set the page size to A5 (148mm x 210mm)
-    const doc = new jsPDF("p", "mm", "a5");
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a5"
+    });
 
-    // Set margins
-    const margin = 10; // 10mm margin on all sides
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
+    // Add shop header
     if (shopOwner) {
-      // Set font size for the header
-      doc.setFontSize(14);
+      doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-
-      // Center the shop name
-      const shopName = shopOwner.shopName;
-      const textWidth = doc.getTextWidth(shopName);
-      const centerX = (pageWidth - textWidth) / 2;
-      doc.text(shopName, centerX, margin);
-
-      // Add other shop details below the shop name
-      doc.setFontSize(12);
+      doc.text(shopOwner.shopName, 105, 15, { align: "center" });
+      
+      doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.text(`KRA Pin: ${shopOwner.kraPin}`, margin, margin + 15);
-      doc.text(`Address: ${shopOwner.postalAddress}`, margin, margin + 25);
-      doc.text(`Phone: ${shopOwner.phone}`, margin, margin + 35);
-
-      // Add a separator line
-      doc.setLineWidth(0.2);
-      doc.line(margin, margin + 40, pageWidth - margin, margin + 40);
-
-      // Add the receipt content
-      let startY = margin + 45; // Start the receipt content below the header
-
-      // Table headers
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("Product", margin, startY);
-      doc.text("Quantity", margin + 60, startY);
-      doc.text("Total", margin + 100, startY);
-
-      // Table rows
-      doc.setFont("helvetica", "normal");
-      startY += 10;
-      selectedProducts.forEach((item) => {
-        const product = products.find((p) => p.id === item.productId);
-        if (product) {
-          doc.text(product.name, margin, startY);
-          doc.text(item.quantity.toString(), margin + 60, startY);
-          doc.text(`$${item.totalPrice.toFixed(2)}`, margin + 100, startY);
-          startY += 10; // Move to the next row
-        }
-      });
-
-      // Add total cost
-      doc.setFont("helvetica", "bold");
-      doc.text(`Total: $${calculateTotalCost().toFixed(2)}`, margin, startY + 10);
-
-      // Save the PDF
-      doc.save("receipt.pdf");
-    } else {
-      setError("Error: Missing shop owner details for receipt.");
+      doc.text(`KRA Pin: ${shopOwner.kraPin}`, 105, 22, { align: "center" });
+      doc.text(`Address: ${shopOwner.postalAddress}`, 105, 27, { align: "center" });
+      doc.text(`Phone: ${shopOwner.phone}`, 105, 32, { align: "center" });
     }
+
+    // Add receipt title
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("SALES RECEIPT", 105, 42, { align: "center" });
+    
+    // Add date
+    doc.setFontSize(10);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 105, 48, { align: "center" });
+
+    // Prepare table data
+    const tableData = selectedProducts.map(item => {
+      const product = products.find(p => p.id === item.productId);
+      return [
+        product?.name || "Unknown",
+        item.quantity.toString(),
+        `$${item.totalPrice.toFixed(2)}`
+      ];
+    });
+
+    // Add table using autoTable
+    (doc as any).autoTable({
+      startY: 55,
+      head: [['Product', 'Qty', 'Amount']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { 
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      styles: { 
+        fontSize: 10,
+        cellPadding: 3,
+        halign: 'left'
+      },
+      columnStyles: {
+        0: { cellWidth: 70 },
+        1: { cellWidth: 20, halign: 'center' },
+        2: { cellWidth: 30, halign: 'right' }
+      }
+    });
+
+    // Add totals
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Total: $${calculateTotalCost().toFixed(2)}`, 140, finalY);
+
+    // Add payment method
+    doc.setFont("helvetica", "normal");
+    doc.text(`Payment Method: ${paymentMethod}`, 15, finalY + 10);
+
+    // Add footer
+    doc.setFontSize(10);
+    doc.text("Thank you for your business!", 105, finalY + 20, { align: "center" });
+
+    // Save the PDF
+    doc.save(`receipt_${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
+  const closeReceiptPopup = () => {
+    setShowReceiptPopup(false);
+    setSelectedProducts([]);
   };
 
   return (
@@ -315,8 +333,10 @@ const SalesForm: React.FC = () => {
       <div className="nav_header">
         <button onClick={() => navigate("/")}>Back</button>
       </div>
-      {error && <p className="error">{error}</p>}
-      {successMessage && <p className="success">{successMessage}</p>}
+      
+      {error && <div className="error">{error}</div>}
+      {successMessage && <div className="success">{successMessage}</div>}
+
       <div className="sale-parent-container">
         <div className="sales-form">
           <div className="product-selection">
@@ -334,7 +354,7 @@ const SalesForm: React.FC = () => {
                 if (selectedProduct) {
                   handleInputChange("productId", selectedProduct.id);
                 } else {
-                  handleInputChange("productId", 0); // Reset if no product is selected
+                  handleInputChange("productId", 0);
                 }
               }}
               placeholder="Search or select a product"
@@ -347,7 +367,9 @@ const SalesForm: React.FC = () => {
                 </option>
               ))}
             </datalist>
+
             {products.length === 0 && <p>No products available. Please add products first.</p>}
+
             <label htmlFor="quantity">Quantity</label>
             <input
               type="number"
@@ -356,6 +378,7 @@ const SalesForm: React.FC = () => {
               value={currentSale.quantity}
               onChange={(e) => handleInputChange("quantity", e.target.value)}
             />
+
             <label htmlFor="discount">Discount (%)</label>
             <input
               type="number"
@@ -365,6 +388,7 @@ const SalesForm: React.FC = () => {
               value={currentSale.discount}
               onChange={(e) => handleInputChange("discount", e.target.value)}
             />
+
             <label htmlFor="vatRate">VAT Rate (%)</label>
             <select
               id="vatRate"
@@ -375,8 +399,9 @@ const SalesForm: React.FC = () => {
               <option value={8}>8%</option>
               <option value={16}>16%</option>
             </select>
+
             <div>
-              <strong>Total Price: Kshs{currentSale.totalPrice}</strong>
+              <strong>Total Price: ${currentSale.totalPrice.toFixed(2)}</strong>
             </div>
             <button onClick={addProduct}>Add Product</button>
           </div>
@@ -393,7 +418,7 @@ const SalesForm: React.FC = () => {
                 ))}
               </ul>
               <div>
-                <strong>Total Sales: ${calculateTotalCost()}</strong>
+                <strong>Total Sales: ${calculateTotalCost().toFixed(2)}</strong>
               </div>
             </div>
           )}
@@ -413,36 +438,71 @@ const SalesForm: React.FC = () => {
 
         <div className="receipt-container">
           <div ref={receiptRef} className="receipt">
-            <h3>Receipt</h3>
+            {shopOwner && (
+              <div className="receipt-header">
+                <h2>{shopOwner.shopName}</h2>
+                <p>KRA Pin: {shopOwner.kraPin}</p>
+                <p>Address: {shopOwner.postalAddress}</p>
+                <p>Phone: {shopOwner.phone}</p>
+              </div>
+            )}
+            
+            <h3>SALES RECEIPT</h3>
+            <p>Date: {new Date().toLocaleDateString()}</p>
+            
             <table>
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th>Quantity</th>
-                  <th>Total Price</th>
+                  <th>Qty</th>
+                  <th>Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {selectedProducts.map((item, index) => (
-                  <tr key={index}>
-                    <td>{products.find((p) => p.id === item.productId)?.name}</td>
-                    <td>{item.quantity}</td>
-                    <td>${item.totalPrice.toFixed(2)}</td>
-                  </tr>
-                ))}
+                {selectedProducts.map((item, index) => {
+                  const product = products.find((p) => p.id === item.productId);
+                  return (
+                    <tr key={index}>
+                      <td>{product?.name || "Unknown"}</td>
+                      <td>{item.quantity}</td>
+                      <td>${item.totalPrice.toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-            <div>
-              <strong>Total: ${calculateTotalCost()}</strong>
+            
+            <div className="receipt-total">
+              <strong>Total: ${calculateTotalCost().toFixed(2)}</strong>
+            </div>
+            
+            <div className="payment-method-receipt">
+              <p>Payment Method: {paymentMethod}</p>
+            </div>
+            
+            <div className="receipt-footer">
+              <p>Thank you for your business!</p>
             </div>
           </div>
-          <div className="receipt-footer">
+          
+          <div className="receipt-actions">
             <button onClick={handleCompleteSale}>Complete Sale</button>
-            <button onClick={handlePrintReceipt}>Print Receipt</button>
-            <button onClick={handleDownloadReceipt}>Download Receipt</button>
           </div>
         </div>
       </div>
+
+      {showReceiptPopup && (
+        <div className="receipt-popup-overlay">
+          <div className="receipt-popup">
+            <h3>Sale Completed Successfully!</h3>
+            <div className="receipt-popup-buttons">
+              <button onClick={handlePrintReceipt}>Print Receipt</button>
+              <button onClick={handleDownloadReceipt}>Download Receipt</button>
+              <button onClick={closeReceiptPopup}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
